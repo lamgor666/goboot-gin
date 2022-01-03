@@ -170,7 +170,7 @@ func GetClientIp(ctx *gin.Context) string {
 	return strings.TrimSpace(parts[0])
 }
 
-func PathvariablePathvariable(ctx *gin.Context, name string, defaultValue ...interface{}) string {
+func Pathvariable(ctx *gin.Context, name string, defaultValue ...interface{}) string {
 	var dv string
 
 	if len(defaultValue) > 0 {
@@ -216,7 +216,7 @@ func PathvariableInt(ctx *gin.Context, name string, defaultValue ...interface{})
 	return castx.ToInt(ctx.Param(name), dv)
 }
 
-func PathvariableInt64PathvariableInt64(ctx *gin.Context, name string, defaultValue ...interface{}) int64 {
+func PathvariableInt64(ctx *gin.Context, name string, defaultValue ...interface{}) int64 {
 	dv := int64(math.MinInt64)
 
 	if len(defaultValue) > 0 {
@@ -228,7 +228,7 @@ func PathvariableInt64PathvariableInt64(ctx *gin.Context, name string, defaultVa
 	return castx.ToInt64(ctx.Param(name), dv)
 }
 
-func PathvariableFloat32PathvariableFloat32(ctx *gin.Context, name string, defaultValue ...interface{}) float32 {
+func PathvariableFloat32(ctx *gin.Context, name string, defaultValue ...interface{}) float32 {
 	dv := float32(math.SmallestNonzeroFloat32)
 
 	if len(defaultValue) > 0 {
