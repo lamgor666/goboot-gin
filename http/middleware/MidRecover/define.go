@@ -28,10 +28,6 @@ func New() gin.HandlerFunc {
 				err = fmt.Errorf("%v", r)
 			}
 
-			if err == nil {
-				return
-			}
-
 			goboot.SendOutput(ctx, nil, err)
 		}()
 
