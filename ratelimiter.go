@@ -23,7 +23,17 @@ func RatelimiterLuaFile(fpath ...string) string {
 		return ""
 	}
 
-	return ratelimiterLuaFile
+	s1 := ratelimiterLuaFile
+
+	if s1 == "" {
+		s2 := fsx.GetRealpath("datadir:ratelimiter.lua")
+
+		if stat, err := os.Stat(s2); err == nil && !stat.IsDir() {
+			s1 = s2
+		}
+	}
+
+	return s1
 }
 
 func RatelimiterCacheDir(dir ...string) string {
@@ -41,5 +51,15 @@ func RatelimiterCacheDir(dir ...string) string {
 		return ""
 	}
 
-	return ratelimiterCacheDir
+	s1 := ratelimiterCacheDir
+
+	if s1 == "" {
+		s2 := fsx.GetRealpath("datadir:cache")
+
+		if stat, err := os.Stat(s2); err == nil && stat.IsDir() {
+			s1 = s2
+		}
+	}
+
+	return s1
 }
