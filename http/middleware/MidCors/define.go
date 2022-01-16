@@ -12,7 +12,7 @@ import (
 
 func New() gin.HandlerFunc {
 	return func(ctx *gin.Context) {
-		settings := goboot.GetCorsSettings()
+		settings := goboot.CorsSettings()
 
 		if settings == nil {
 			ctx.Next()
