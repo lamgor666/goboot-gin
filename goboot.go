@@ -1,21 +1,17 @@
 package goboot
 
 import (
-	"fmt"
 	"github.com/gin-gonic/gin"
-	"github.com/lamgor666/goboot-common/AppConf"
 	"github.com/lamgor666/goboot-common/enum/JwtVerifyErrno"
 	"github.com/lamgor666/goboot-common/enum/RegexConst"
 	"github.com/lamgor666/goboot-common/util/castx"
 	"github.com/lamgor666/goboot-common/util/jsonx"
-	"github.com/lamgor666/goboot-common/util/numberx"
 	"github.com/lamgor666/goboot-common/util/stringx"
 	"github.com/lamgor666/goboot-common/util/validatex"
 	"github.com/lamgor666/goboot-dal/RateLimiter"
 	"github.com/lamgor666/goboot-gin/http/error/JwtAuthError"
 	"github.com/lamgor666/goboot-gin/http/error/RateLimitError"
 	"github.com/lamgor666/goboot-gin/http/error/ValidateError"
-	"math/big"
 	"strings"
 	"time"
 )
@@ -85,40 +81,6 @@ func WithErrorHandlers(handlers []ErrorHandler) {
 	}
 }
 
-func ErrorHandlers() []ErrorHandler {
-	return errorHandlers
-}
-
-func LogExecuteTime(ctx *gin.Context) {
-	if !ExecuteTimeLogEnabled() {
-		return
-	}
-
-	elapsedTime := calcElapsedTime(ctx)
-
-	if elapsedTime == "" {
-		return
-	}
-
-	sb := strings.Builder{}
-	sb.WriteString(GetMethod(ctx))
-	sb.WriteString(" ")
-	sb.WriteString(GetRequestUrl(ctx, true))
-	sb.WriteString(", total elapsed time: " + elapsedTime)
-	ExecuteTimeLogLogger().Info(sb.String())
-	ctx.Header("X-Response-Time", elapsedTime)
-}
-
-func AddPoweredBy(ctx *gin.Context) {
-	poweredBy := AppConf.GetString("app.poweredBy")
-
-	if poweredBy == "" {
-		return
-	}
-
-	ctx.Header("X-Powered-By", poweredBy)
-}
-
 func RateLimitCheck(ctx *gin.Context, handlerName string, settings interface{}) {
 	var total int
 	var duration time.Duration
@@ -176,7 +138,7 @@ func JwtAuthCheck(ctx *gin.Context, settingsKey string) {
 		return
 	}
 
-	settings := GetJwtSettings(settingsKey)
+	settings := JwtSettings(settingsKey)
 
 	if settings == nil {
 		return
@@ -193,7 +155,7 @@ func JwtAuthCheck(ctx *gin.Context, settingsKey string) {
 		panic(JwtAuthError.New(JwtVerifyErrno.NotFound))
 	}
 
-	errno := VerifyJsonWebToken(token, settings)
+	errno := VerifyJwt(token, settings)
 
 	if errno < 0 {
 		panic(JwtAuthError.New(errno))
@@ -261,34 +223,4 @@ func ValidateCheck(ctx *gin.Context, settings interface{}) {
 	if len(validateErrors) > 0 {
 		panic(ValidateError.New(validateErrors))
 	}
-}
-
-func calcElapsedTime(ctx *gin.Context) string {
-	var execStart time.Time
-	v1, _ := ctx.Get("ExecStart")
-
-	if t1, ok := v1.(time.Time); ok {
-		ctx.Set("ExecStart", nil)
-		execStart = t1
-	}
-
-	if execStart.IsZero() {
-		return ""
-	}
-
-	n1 := big.NewFloat(time.Since(execStart).Seconds())
-
-	if n1.Cmp(big.NewFloat(1.0)) != -1 {
-		secs, _ := n1.Float64()
-		return numberx.ToDecimalString(secs, 3) + "s"
-	}
-
-	n1 = n1.Mul(n1, big.NewFloat(1000.0))
-
-	if n1.Cmp(big.NewFloat(1.0)) == -1 {
-		return "0ms"
-	}
-
-	msecs, _ := n1.Float64()
-	return fmt.Sprintf("%dms", castx.ToInt(msecs))
 }

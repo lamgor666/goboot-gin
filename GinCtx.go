@@ -1,6 +1,7 @@
 package goboot
 
 import (
+	"fmt"
 	"github.com/dgrijalva/jwt-go"
 	"github.com/gin-gonic/gin"
 	"github.com/gin-gonic/gin/render"
@@ -18,8 +19,10 @@ import (
 	"github.com/lamgor666/goboot-gin/http/response/AttachmentResponse"
 	"github.com/lamgor666/goboot-gin/http/response/ImageResponse"
 	"math"
+	"math/big"
 	"regexp"
 	"strings"
+	"time"
 )
 
 func GetMethod(ctx *gin.Context) string {
@@ -394,7 +397,7 @@ func GetJwt(ctx *gin.Context) *jwt.Token {
 		return nil
 	}
 
-	tk, _ := ParseJsonWebToken(token)
+	tk, _ := ParseJwt(token)
 	return tk
 }
 
@@ -582,18 +585,17 @@ func DtoBind(ctx *gin.Context, dto interface{}) error {
 
 func SendOutput(ctx *gin.Context, payload ResponsePayload, err error) {
 	if err != nil {
-		handlers := ErrorHandlers()
 		var handler ErrorHandler
 
-		for _, h := range handlers {
+		for _, h := range errorHandlers {
 			if h.MatchError(err) {
 				handler = h
 				break
 			}
 		}
 
-		LogExecuteTime(ctx)
-		AddPoweredBy(ctx)
+		logExecuteTime(ctx)
+		addPoweredBy(ctx)
 
 		if handler == nil {
 			RuntimeLogger().Error(errorx.Stacktrace(err))
@@ -621,8 +623,8 @@ func SendOutput(ctx *gin.Context, payload ResponsePayload, err error) {
 		return
 	}
 
-	LogExecuteTime(ctx)
-	AddPoweredBy(ctx)
+	logExecuteTime(ctx)
+	addPoweredBy(ctx)
 
 	if payload == nil {
 		ctx.Render(200, render.Data{
@@ -770,4 +772,64 @@ func getMapWithRules(arg0 interface{}, rules []string) map[string]interface{} {
 	}
 
 	return dstMap
+}
+
+func logExecuteTime(ctx *gin.Context) {
+	if !ExecuteTimeLogEnabled() {
+		return
+	}
+
+	elapsedTime := calcElapsedTime(ctx)
+
+	if elapsedTime == "" {
+		return
+	}
+
+	sb := strings.Builder{}
+	sb.WriteString(GetMethod(ctx))
+	sb.WriteString(" ")
+	sb.WriteString(GetRequestUrl(ctx, true))
+	sb.WriteString(", total elapsed time: " + elapsedTime)
+	ExecuteTimeLogLogger().Info(sb.String())
+	ctx.Header("X-Response-Time", elapsedTime)
+}
+
+func addPoweredBy(ctx *gin.Context) {
+	poweredBy := AppConf.GetString("app.poweredBy")
+
+	if poweredBy == "" {
+		return
+	}
+
+	ctx.Header("X-Powered-By", poweredBy)
+}
+
+func calcElapsedTime(ctx *gin.Context) string {
+	var execStart time.Time
+	v1, _ := ctx.Get("ExecStart")
+
+	if t1, ok := v1.(time.Time); ok {
+		ctx.Set("ExecStart", nil)
+		execStart = t1
+	}
+
+	if execStart.IsZero() {
+		return ""
+	}
+
+	n1 := big.NewFloat(time.Since(execStart).Seconds())
+
+	if n1.Cmp(big.NewFloat(1.0)) != -1 {
+		secs, _ := n1.Float64()
+		return numberx.ToDecimalString(secs, 3) + "s"
+	}
+
+	n1 = n1.Mul(n1, big.NewFloat(1000.0))
+
+	if n1.Cmp(big.NewFloat(1.0)) == -1 {
+		return "0ms"
+	}
+
+	msecs, _ := n1.Float64()
+	return fmt.Sprintf("%dms", castx.ToInt(msecs))
 }

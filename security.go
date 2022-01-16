@@ -6,7 +6,8 @@ import (
 	"github.com/dgrijalva/jwt-go"
 	"github.com/gin-gonic/gin"
 	"github.com/go-errors/errors"
-	"github.com/lamgor666/goboot-common/AppConf"
+	GCorsSettings "github.com/lamgor666/goboot-common/CorsSettings"
+	GJwtSettings "github.com/lamgor666/goboot-common/JwtSettings"
 	"github.com/lamgor666/goboot-common/enum/JwtVerifyErrno"
 	"github.com/lamgor666/goboot-common/util/castx"
 	"github.com/lamgor666/goboot-common/util/fsx"
@@ -16,78 +17,100 @@ import (
 	"time"
 )
 
-var corsSettings *CorsSettings
+var corsSettings *GCorsSettings.Settings
 var jwtPublicKeyPemFile string
 var jwtPrivateKeyPemFile string
-var jwtSettings map[string]*JwtSettings
+var jwtSettings map[string]*GJwtSettings.Settings
 
-func WithCorsSettings(settings ...map[string]interface{}) {
-	_settings := map[string]interface{}{}
+func CorsSettings(settings ...interface{}) *GCorsSettings.Settings {
+	if len(settings) > 0 {
+		if settings[0] == nil {
+			return nil
+		}
 
-	if len(settings) > 0 && len(settings[0]) > 0 {
-		_settings = settings[0]
+		var _settings *GCorsSettings.Settings
+
+		if st, ok := settings[0].(*GCorsSettings.Settings); ok {
+			_settings = st
+		} else if map1, ok := settings[0].(map[string]interface{}); ok && len(map1) > 0 {
+			_settings = GCorsSettings.New(map1)
+		}
+
+		if _settings != nil {
+			corsSettings = _settings
+		}
+
+		return nil
 	}
 
-	if len(_settings) < 1 {
-		_settings = AppConf.GetMap("cors")
-	}
-}
-
-func GetCorsSettings() *CorsSettings {
 	return corsSettings
 }
 
-func WithJwtPublicKeyPemFile(fpath string) {
-	fpath = fsx.GetRealpath(fpath)
+func JwtPublicKeyPemFile(fpath ...string) string {
+	if len(fpath) > 0 {
+		if fpath[0] == "" {
+			return ""
+		}
 
-	if stat, err := os.Stat(fpath); err == nil && !stat.IsDir() {
-		jwtPublicKeyPemFile = fpath
+		s1 := fsx.GetRealpath(fpath[0])
+
+		if stat, err := os.Stat(s1); err == nil && !stat.IsDir() {
+			jwtPublicKeyPemFile = s1
+		}
+
+		return ""
 	}
-}
 
-func GetJwtPublicKeyPemFile() string {
 	return jwtPublicKeyPemFile
 }
 
-func WithJwtPrivateKeyPemFile(fpath string) {
-	fpath = fsx.GetRealpath(fpath)
+func JwtPrivateKeyPemFile(fpath ...string) string {
+	if len(fpath) > 0 {
+		if fpath[0] == "" {
+			return ""
+		}
 
-	if stat, err := os.Stat(fpath); err == nil && !stat.IsDir() {
-		jwtPrivateKeyPemFile = fpath
+		s1 := fsx.GetRealpath(fpath[0])
+
+		if stat, err := os.Stat(s1); err == nil && !stat.IsDir() {
+			jwtPrivateKeyPemFile = s1
+		}
+
+		return ""
 	}
-}
 
-func GetJwtPrivateKeyPemFile() string {
 	return jwtPrivateKeyPemFile
 }
 
-func WithJwtSettings(key string, settings ...map[string]interface{}) {
-	_settings := map[string]interface{}{}
+func JwtSettings(key string, settings ...interface{}) *GJwtSettings.Settings {
+	if len(settings) > 0 {
+		if settings[0] == nil {
+			return nil
+		}
 
-	if len(settings) > 0 && len(settings[0]) > 0 {
-		_settings = settings[0]
+		var _settings *GJwtSettings.Settings
+
+		if st, ok := settings[0].(*GJwtSettings.Settings); ok {
+			_settings = st
+		} else if map1, ok := settings[0].(map[string]interface{}); ok && len(map1) > 0 {
+			map1["publicKeyPemFile"] = jwtPublicKeyPemFile
+			map1["privateKeyPemFile"] = jwtPrivateKeyPemFile
+			_settings = GJwtSettings.New(map1)
+		}
+
+		if _settings == nil {
+			return nil
+		}
+
+		if len(jwtSettings) < 1 {
+			jwtSettings = map[string]*GJwtSettings.Settings{key: _settings}
+		} else {
+			jwtSettings[key] = _settings
+		}
+
+		return nil
 	}
 
-	if len(_settings) < 1 {
-		_settings = AppConf.GetMap("jwt." + key)
-	}
-
-	if _, ok := _settings["publicKeyPemFile"]; !ok {
-		_settings["publicKeyPemFile"] = jwtPublicKeyPemFile
-	}
-
-	if _, ok := _settings["privateKeyPemFile"]; !ok {
-		_settings["privateKeyPemFile"] = jwtPrivateKeyPemFile
-	}
-
-	if len(jwtSettings) < 1 {
-		jwtSettings = map[string]*JwtSettings{key: NewJwtSettings(_settings)}
-	} else {
-		jwtSettings[key] = NewJwtSettings(_settings)
-	}
-}
-
-func GetJwtSettings(key string) *JwtSettings {
 	if len(jwtSettings) < 1 {
 		return nil
 	}
@@ -95,7 +118,7 @@ func GetJwtSettings(key string) *JwtSettings {
 	return jwtSettings[key]
 }
 
-func ParseJsonWebToken(token string, pubpem ...string) (*jwt.Token, error) {
+func ParseJwt(token string, pubpem ...string) (*jwt.Token, error) {
 	var fpath string
 
 	if len(pubpem) > 0 && pubpem[0] != "" {
@@ -124,13 +147,13 @@ func ParseJsonWebToken(token string, pubpem ...string) (*jwt.Token, error) {
 }
 
 // @param *jwt.Token|string arg0
-func VerifyJsonWebToken(arg0 interface{}, settings *JwtSettings) int {
+func VerifyJwt(arg0 interface{}, settings *GJwtSettings.Settings) int {
 	var token *jwt.Token
 
 	if tk, ok := arg0.(*jwt.Token); ok {
 		token = tk
 	} else if s1, ok := arg0.(string); ok && s1 != "" {
-		tk, _ := ParseJsonWebToken(s1, settings.publicKeyPemFile)
+		tk, _ := ParseJwt(s1, settings.PublicKeyPemFile())
 		token = tk
 	}
 
@@ -160,13 +183,13 @@ func VerifyJsonWebToken(arg0 interface{}, settings *JwtSettings) int {
 }
 
 // @param *JwtSettings|string arg0
-func BuildJsonWebToken(arg0 interface{}, isRefreshToken bool, claims ...map[string]interface{}) (token string, err error) {
-	var settings *JwtSettings
+func BuildJwt(arg0 interface{}, isRefreshToken bool, claims ...map[string]interface{}) (token string, err error) {
+	var settings *GJwtSettings.Settings
 
-	if s1, ok := arg0.(*JwtSettings); ok && s1 != nil {
+	if s1, ok := arg0.(*GJwtSettings.Settings); ok && s1 != nil {
 		settings = s1
 	} else if s1, ok := arg0.(string); ok && s1 != "" {
-		settings = GetJwtSettings(s1)
+		settings = JwtSettings(s1)
 	}
 
 	if settings == nil {
@@ -174,7 +197,7 @@ func BuildJsonWebToken(arg0 interface{}, isRefreshToken bool, claims ...map[stri
 		return
 	}
 
-	keyBytes := loadKeyPem("pri", settings.privateKeyPemFile)
+	keyBytes := loadKeyPem("pri", settings.PrivateKeyPemFile())
 
 	if len(keyBytes) < 1 {
 		err = errors.New("in goboot.BuildJsonWebToken function, fail to load private key from pem file")
@@ -411,7 +434,7 @@ func JwtClaimIntSlice(arg0 interface{}, name string) []int {
 	} else if ctx, ok := arg0.(*gin.Context); ok {
 		token = GetJwt(ctx)
 	} else if s1, ok := arg0.(string); ok && s1 != "" {
-		tk, _ := ParseJsonWebToken(s1)
+		tk, _ := ParseJwt(s1)
 		token = tk
 	}
 
@@ -433,7 +456,7 @@ func loadKeyPem(typ string, arg1 interface{}) []byte {
 
 	if s1, ok := arg1.(string); ok && s1 != "" {
 		fpath = s1
-	} else if s1, ok := arg1.(*JwtSettings); ok && s1 != nil {
+	} else if s1, ok := arg1.(*GJwtSettings.Settings); ok && s1 != nil {
 		switch typ {
 		case "pub":
 			fpath = s1.PublicKeyPemFile()
@@ -445,9 +468,9 @@ func loadKeyPem(typ string, arg1 interface{}) []byte {
 	if fpath == "" {
 		switch typ {
 		case "pub":
-			fpath = GetJwtPublicKeyPemFile()
+			fpath = jwtPublicKeyPemFile
 		case "pri":
-			fpath = GetJwtPrivateKeyPemFile()
+			fpath = jwtPrivateKeyPemFile
 		}
 	}
 
@@ -472,7 +495,7 @@ func getTokenInternal(arg0 interface{}) *jwt.Token {
 	} else if ctx, ok := arg0.(*gin.Context); ok {
 		token = GetJwt(ctx)
 	} else if s1, ok := arg0.(string); ok && s1 != "" {
-		tk, _ := ParseJsonWebToken(s1)
+		tk, _ := ParseJwt(s1)
 		token = tk
 	}
 

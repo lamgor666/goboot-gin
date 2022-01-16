@@ -8,26 +8,38 @@ import (
 var ratelimiterLuaFile string
 var ratelimiterCacheDir string
 
-func WithRatelimiterLuaFile(fpath string) {
-	fpath = fsx.GetRealpath(fpath)
+func RatelimiterLuaFile(fpath ...string) string {
+	if len(fpath) > 0 {
+		if fpath[0] == "" {
+			return ""
+		}
 
-	if stat, err := os.Stat(fpath); err == nil && !stat.IsDir() {
-		ratelimiterLuaFile = fpath
+		s1 := fsx.GetRealpath(fpath[0])
+
+		if stat, err := os.Stat(s1); err == nil && !stat.IsDir() {
+			ratelimiterLuaFile = s1
+		}
+
+		return ""
 	}
-}
 
-func RatelimiterLuaFile() string {
 	return ratelimiterLuaFile
 }
 
-func WithRatelimiterCacheDir(dir string) {
-	dir = fsx.GetRealpath(dir)
+func RatelimiterCacheDir(dir ...string) string {
+	if len(dir) > 0 {
+		if dir[0] == "" {
+			return ""
+		}
 
-	if stat, err := os.Stat(dir); err == nil && stat.IsDir() {
-		ratelimiterCacheDir = dir
+		s1 := fsx.GetRealpath(dir[0])
+
+		if stat, err := os.Stat(s1); err == nil && stat.IsDir() {
+			ratelimiterCacheDir = s1
+		}
+
+		return ""
 	}
-}
 
-func RatelimiterCacheDir() string {
 	return ratelimiterCacheDir
 }
