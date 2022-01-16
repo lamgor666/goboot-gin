@@ -119,7 +119,7 @@ func AddPoweredBy(ctx *gin.Context) {
 	ctx.Header("X-Powered-By", poweredBy)
 }
 
-func RateLimitCheck(ctx *gin.Context, handlerName string, settings interface{}) error {
+func RateLimitCheck(ctx *gin.Context, handlerName string, settings interface{}) {
 	var total int
 	var duration time.Duration
 	var limitByIp bool
@@ -152,7 +152,7 @@ func RateLimitCheck(ctx *gin.Context, handlerName string, settings interface{}) 
 	}
 
 	if handlerName == "" || total < 1 || duration < 1 {
-		return nil
+		return
 	}
 
 	id := handlerName
@@ -167,21 +167,19 @@ func RateLimitCheck(ctx *gin.Context, handlerName string, settings interface{}) 
 	remaining := castx.ToInt(result["remaining"])
 
 	if remaining < 0 {
-		return RateLimitError.New(result)
+		panic(RateLimitError.New(result))
 	}
-
-	return nil
 }
 
-func JwtAuthCheck(ctx *gin.Context, settingsKey string) error {
+func JwtAuthCheck(ctx *gin.Context, settingsKey string) {
 	if settingsKey == "" {
-		return nil
+		return
 	}
 
 	settings := GetJwtSettings(settingsKey)
 
 	if settings == nil {
-		return nil
+		return
 	}
 
 	token := GetHeader(ctx, "Authorization")
@@ -192,19 +190,19 @@ func JwtAuthCheck(ctx *gin.Context, settingsKey string) error {
 	}
 
 	if token == "" {
-		return JwtAuthError.New(JwtVerifyErrno.NotFound)
+		panic(JwtAuthError.New(JwtVerifyErrno.NotFound))
 	}
 
 	errno := VerifyJsonWebToken(token, settings)
 
 	if errno < 0 {
-		return JwtAuthError.New(errno)
+		panic(JwtAuthError.New(errno))
 	}
 
-	return nil
+	return
 }
 
-func ValidateCheck(ctx *gin.Context, settings interface{}) error {
+func ValidateCheck(ctx *gin.Context, settings interface{}) {
 	rules := make([]string, 0)
 	var failfast bool
 
@@ -242,7 +240,7 @@ func ValidateCheck(ctx *gin.Context, settings interface{}) error {
 	}
 
 	if len(rules) < 1 {
-		return nil
+		return
 	}
 
 	validator := validatex.NewValidator()
@@ -252,19 +250,17 @@ func ValidateCheck(ctx *gin.Context, settings interface{}) error {
 		errorTips := validatex.FailfastValidate(validator, data, rules)
 
 		if errorTips != "" {
-			return ValidateError.New(errorTips, true)
+			panic(ValidateError.New(errorTips, true))
 		}
 
-		return nil
+		return
 	}
 
 	validateErrors := validatex.Validate(validator, data, rules)
 
 	if len(validateErrors) > 0 {
-		return ValidateError.New(validateErrors)
+		panic(ValidateError.New(validateErrors))
 	}
-
-	return nil
 }
 
 func calcElapsedTime(ctx *gin.Context) string {
